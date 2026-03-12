@@ -14,7 +14,6 @@ app.use(helmet());
 app.use(cors());
 app.use(morgan("dev"));
 app.use(express.json());
-app.use("/api/zaragoza", zaragozaRoutes);
 
 app.get("/", (req, res) => {
   res.json({
@@ -23,6 +22,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/events", eventRoutes);
+app.use("/api/zaragoza", zaragozaRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

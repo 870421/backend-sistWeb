@@ -1,21 +1,51 @@
 const axios = require("axios");
 
-const BASE_URL = "https://www.zaragoza.es/sede/servicio/cultura/evento.json";
+const BASE_URL = "https://www.zaragoza.es/sede/servicio/cultura/evento";
 
-async function fetchEvents({ start = 0, rows = 50, q = "" }) {
+const client = axios.create({
+  baseURL: BASE_URL,
+  headers: {
+    Accept: "application/json"
+  }
+});
 
-  const response = await axios.get(BASE_URL, {
+async function getEvents(start = 0, rows = 10) {
+
+  const res = await client.get("/list", {
+    params: { start, rows }
+  });
+
+  return res.data;
+}
+
+async function getEventById(id) {
+
+  const res = await client.get(`/${id}`);
+
+  return res.data;
+}
+
+async function getTodayEvents() {
+
+  const res = await client.get("/hoy");
+
+  return res.data;
+}
+
+async function searchEvents(text) {
+
+  const res = await client.get("/list", {
     params: {
-      start,
-      rows,
-      srsname: "wgs84",
-      ...(q && { q })
+      q: text
     }
   });
 
-  return response.data;
+  return res.data;
 }
 
 module.exports = {
-  fetchEvents
+  getEvents,
+  getEventById,
+  getTodayEvents,
+  searchEvents
 };
