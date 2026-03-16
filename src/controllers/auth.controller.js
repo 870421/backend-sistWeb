@@ -1,3 +1,6 @@
+const crypto = require('crypto');
+const { sendEmail } = require('../utils/email');
+
 // Endpoint para actualizar perfil del usuario autenticado
 async function updateProfile(req, res) {
   try {
@@ -369,6 +372,147 @@ async function logout(req, res) {
   return res.status(200).json({ message: 'Logout exitoso' });
 }
 
+// Endpoint para solicitar recuperación de contraseña
+async function requestPasswordReset(req, res) {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      // CORREO NO REGISTRADO
+      return res.status(404).json({
+        message: 'Este correo no está registrado en EventConnect'
+      });
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = Date.now() + 60 * 60 * 1000;
+
+    user.resetPasswordToken = token;
+    user.resetPasswordExpires = new Date(expires);
+    await user.save();
+
+        const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+
+    await sendEmail({
+      to: user.email,
+      subject: '🔐 Recupera tu contraseña - EventConnect',
+      html: `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; }
+            .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 20px; text-align: center; }
+            .header h1 { font-size: 28px; margin-bottom: 5px; }
+            .header p { font-size: 14px; opacity: 0.9; }
+            .content { padding: 40px 30px; }
+            .content h2 { color: #333; font-size: 20px; margin-bottom: 20px; }
+            .content p { color: #666; font-size: 15px; line-height: 1.6; margin-bottom: 20px; }
+            .button-wrapper { text-align: center; margin: 30px 0; }
+            .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; transition: transform 0.2s, box-shadow 0.2s; }
+            .button:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4); }
+            .code-box { background: #f8f9fa; border-left: 4px solid #667eea; padding: 15px 20px; margin: 20px 0; border-radius: 4px; font-family: 'Courier New', monospace; word-break: break-all; color: #333; font-size: 12px; }
+            .warning { background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 15px; margin: 20px 0; color: #856404; font-size: 13px; line-height: 1.5; }
+            .footer { background: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e0e0e0; }
+            .footer p { color: #999; font-size: 12px; margin: 5px 0; }
+            .logo { font-size: 24px; font-weight: bold; color: white; margin-bottom: 10px; }
+            .divider { height: 1px; background: #e0e0e0; margin: 30px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <!-- Header -->
+            <div class="header">
+              <div class="logo">🎯 EventConnect</div>
+              <h1>Recupera tu contraseña</h1>
+              <p>Solicitud de restablecimiento seguro</p>
+            </div>
+
+            <!-- Contenido -->
+            <div class="content">
+              <h2>Hola ${user.name || user.username},</h2>
+              
+              <p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta en <strong>EventConnect</strong>.</p>
+              
+              <p>Si fuiste tú quien realizó esta solicitud, haz clic en el botón de abajo para crear una nueva contraseña:</p>
+
+              <div class="button-wrapper">
+                <a href="${resetUrl}" class="button"><span style="color: white;">🔓 Restablecer contraseña</span></a>
+              </div>
+
+              <p style="text-align: center; color: #999; font-size: 13px;">O copia y pega este enlace en tu navegador:</p>
+              <div class="code-box">${resetUrl}</div>
+
+              <div class="divider"></div>
+
+              <div class="warning">
+                <strong>⚠️ Importante:</strong> Este enlace expirará en <strong>1 hora</strong>. Si no realizaste esta solicitud, no hagas clic en el enlace y tu contraseña seguirá siendo segura.
+              </div>
+
+              <p style="color: #888; font-size: 13px;">
+                Si tienes problemas para restablecer tu contraseña, contacta con nuestro equipo de soporte.
+              </p>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+              <p><strong>EventConnect</strong> - Conecta con tu ciudad</p>
+              <p>© 2026 EventConnect. Todos los derechos reservados.</p>
+              <p style="margin-top: 10px; font-size: 11px;">
+                Este es un correo automatizado, por favor no respondas a esta dirección.
+              </p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    });
+
+    // CORREO EXISTE → OK
+    return res.status(200).json({
+      message: 'Hemos enviado un enlace de recuperación a tu correo'
+    });
+  } catch (error) {
+    console.error('REQUEST PASSWORD RESET ERROR:', error);
+    return res.status(500).json({ message: 'Error al solicitar recuperación de contraseña' });
+  }
+}
+
+// Endpoint para restablecer contraseña usando token
+async function resetPassword(req, res) {
+  try {
+    const { token, password } = req.body;
+
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: new Date() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Token inválido o expirado' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    user.passwordHash = passwordHash;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+
+    await user.save();
+
+    return res.status(200).json({ message: 'Contraseña restablecida correctamente' });
+  } catch (error) {
+    console.error('RESET PASSWORD ERROR:', error);
+    return res.status(500).json({ message: 'Error al restablecer contraseña' });
+  }
+}
+
 module.exports = {
   register,
   login,
@@ -376,5 +520,7 @@ module.exports = {
   refreshToken,
   logout,
   getProfile,
-  updateProfile
+  updateProfile,
+  requestPasswordReset,
+  resetPassword
 };
