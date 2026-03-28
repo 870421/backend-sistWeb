@@ -14,6 +14,32 @@ const errorHandler = require("./middlewares/errorHandler");
 const zaragozaRoutes = require("./routes/zaragoza.routes");
 const recommendRoutes = require('./routes/recommend.routes');
 
+// Swagger
+const swaggerUi = require('swagger-ui-express');
+const swaggerJSDoc = require('swagger-jsdoc');
+
+const swaggerDefinition = {
+  openapi: '3.0.0',
+  info: {
+    title: 'EventConnect API',
+    version: '1.0.0',
+    description: 'Documentación de la API REST de EventConnect',
+  },
+  servers: [
+    {
+      url: 'http://localhost:3000',
+      description: 'Servidor local',
+    },
+  ],
+};
+
+const options = {
+  swaggerDefinition,
+  apis: ['./src/routes/*.js'], // Puedes ajustar el path según tus rutas
+};
+
+const swaggerSpec = swaggerJSDoc(options);
+
 const app = express();
 
 app.use(helmet());
@@ -23,6 +49,9 @@ app.use(cors({
 }));
 app.use(morgan("dev"));
 app.use(express.json({ limit: '10mb' }));
+
+// Ruta Swagger UI
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.get("/", (req, res) => {
   res.json({
