@@ -3,7 +3,7 @@ const cookieParser = require('cookie-parser');
 
 const requireAuth = require('../middlewares/auth.middleware');
 const requireAdmin = require('../middlewares/admin.middleware');
-const { getDashboard, getUsers } = require('../controllers/admin.controller');
+const { getDashboard, getUsers, getEvents } = require('../controllers/admin.controller');
 
 const router = express.Router();
 
@@ -61,5 +61,29 @@ router.get('/dashboard', requireAuth, requireAdmin, getDashboard);
  *         description: No autorizado
  */
 router.get('/users', requireAuth, requireAdmin, getUsers);
+
+/**
+ * @swagger
+ * /api/admin/events:
+ *   get:
+ *     summary: Listar todos los eventos
+ *     tags: [Administración]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de eventos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Event'
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: No autorizado
+ */
+router.get('/events', requireAuth, requireAdmin, getEvents);
 
 module.exports = router;

@@ -60,7 +60,30 @@ async function getUsers(req, res) {
   }
 }
 
+async function getEvents(req, res) {
+  try {
+    const events = await Event.find()
+      .sort({ startDate: -1 })
+      .select('title description category startDate status enrolled');
+
+    const mappedEvents = events.map((event) => ({
+      id: event._id,
+      name: event.title,
+      description: event.description,
+      category: event.category || 'General',
+      date: event.startDate,
+      status: event.status === 'active' ? 'active' : 'pending',
+      enrolled: event.enrolled || 0
+    }));
+
+    return res.status(200).json({ events: mappedEvents });
+  } catch (error) {
+    return res.status(500).json({ message: 'Error al obtener eventos de admin' });
+  }
+}
+
 module.exports = {
   getDashboard,
-  getUsers
+  getUsers,
+  getEvents
 };
