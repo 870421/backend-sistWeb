@@ -2,6 +2,9 @@ const User = require('../models/User');
 const Event = require('../models/Event');
 const Report = require('../models/Report');
 const Settings = require('../models/Settings');
+const Conversation = require('../models/Conversation');
+const Message = require('../models/Message');
+const FriendRequest = require('../models/FriendRequest');
 
 async function getDashboard(req, res) {
   try {
@@ -159,6 +162,135 @@ function mapReportReason(reason) {
     'other': 'Otro'
   };
   return reasonMap[reason] || reason;
+}
+
+async function getReportDetail(req, res) {
+  try {
+    const { id } = req.params;
+    const report = await Report.findById(id)
+      .populate('involvedUser', 'name username email role isBlocked createdAt')
+      .populate('reportedBy', 'name username email')
+      .populate('resolvedBy', 'name username');
+
+    if (!report) {
+      return res.status(404).json({ message: 'Reporte no encontrado' });
+    }
+
+    return res.status(200).json({
+      report: {
+        id: report._id,
+        type: mapReportType(report.type),
+        involvedUser: report.involvedUser?.name || 'Usuario desconocido',
+        involvedUserId: report.involvedUser?._id,
+        involvedUsername: report.involvedUser?.username,
+        involvedUserEmail: report.involvedUser?.email,
+        involvedUserRole: report.involvedUser?.role,
+        involvedUserBlocked: report.involvedUser?.isBlocked,
+        involvedUserCreatedAt: report.involvedUser?.createdAt,
+        description: report.description,
+        reportedBy: report.reportedBy?.name || 'Anónimo',
+        reportedByUsername: report.reportedBy?.username,
+        reason: mapReportReason(report.reason),
+        reasonRaw: report.reason,
+        category: report.category,
+        status: report.status,
+        resolution: report.resolution,
+        resolvedBy: report.resolvedBy?.name || null,
+        createdAt: report.createdAt,
+        resolvedAt: report.resolvedAt
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Error al obtener detalles del reporte' });
+  }
+}
+
+async function resolveReport(req, res) {
+  try {
+    const { id } = req.params;
+    const { resolution, action } = req.body;
+    const adminId = req.user._id;
+
+    const report = await Report.findById(id);
+    if (!report) {
+      return res.status(404).json({ message: 'Reporte no encontrado' });
+    }
+
+    report.status = 'resolved';
+    report.resolution = resolution || 'Reporte resuelto';
+    report.resolvedBy = adminId;
+    report.resolvedAt = new Date();
+    await report.save();
+
+    // Si la acción es banear, bloquear el usuario
+    if (action === 'ban') {
+      await User.findByIdAndUpdate(report.involvedUser, { isBlocked: true });
+    }
+
+    return res.status(200).json({
+      message: 'Reporte resuelto exitosamente',
+      report: {
+        id: report._id,
+        status: report.status,
+        resolution: report.resolution,
+        resolvedAt: report.resolvedAt
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Error al resolver reporte' });
+  }
+}
+
+async function rejectReport(req, res) {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const adminId = req.user._id;
+
+    const report = await Report.findById(id);
+    if (!report) {
+      return res.status(404).json({ message: 'Reporte no encontrado' });
+    }
+
+    report.status = 'rejected';
+    report.resolution = reason || 'Reporte rechazado sin justificación';
+    report.resolvedBy = adminId;
+    report.resolvedAt = new Date();
+    await report.save();
+
+    return res.status(200).json({
+      message: 'Reporte rechazado',
+      report: {
+        id: report._id,
+        status: report.status,
+        resolution: report.resolution,
+        resolvedAt: report.resolvedAt
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Error al rechazar reporte' });
+  }
+}
+
+async function markReportUnderReview(req, res) {
+  try {
+    const { id } = req.params;
+    const report = await Report.findByIdAndUpdate(id, { status: 'under_review' }, { new: true });
+
+    if (!report) {
+      return res.status(404).json({ message: 'Reporte no encontrado' });
+    }
+
+    return res.status(200).json({
+      message: 'Reporte marcado bajo revisión',
+      report: {
+        id: report._id,
+        status: report.status
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Error al marcar reporte bajo revisión' });
+  }
 }
 
 async function getSettings(req, res) {
@@ -346,12 +478,137 @@ async function downloadBackup(req, res) {
   }
 }
 
+async function getUserDetail(req, res) {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id)
+      .select('name email username role isBlocked bio location avatarUrl createdAt');
+
+    if (!user) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    return res.status(200).json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        isBlocked: user.isBlocked,
+        bio: user.bio,
+        location: user.location,
+        avatarUrl: user.avatarUrl,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Error al obtener detalles del usuario' });
+  }
+}
+
+async function blockUser(req, res) {
+  try {
+    const { id } = req.params;
+    
+    // No permitir bloquear a otro admin (solo a usuarios)
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    if (user.role === 'admin') {
+      return res.status(403).json({ message: 'No puedes bloquear a otro admin' });
+    }
+
+    user.isBlocked = true;
+    await user.save();
+
+    return res.status(200).json({
+      message: 'Usuario bloqueado exitosamente',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        isBlocked: user.isBlocked
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Error al bloquear usuario' });
+  }
+}
+
+async function unblockUser(req, res) {
+  try {
+    const { id } = req.params;
+    
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    user.isBlocked = false;
+    await user.save();
+
+    return res.status(200).json({
+      message: 'Usuario desbloqueado exitosamente',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        isBlocked: user.isBlocked
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Error al desbloquear usuario' });
+  }
+}
+
+async function deleteUser(req, res) {
+  try {
+    const { id } = req.params;
+    
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    // No permitir eliminar a otro admin
+    if (user.role === 'admin') {
+      return res.status(403).json({ message: 'No puedes eliminar a un admin' });
+    }
+
+    // Eliminar referencias del usuario en otras colecciones
+    await Promise.all([
+      Conversation.deleteMany({ participants: id }),
+      Message.deleteMany({ sender: id }),
+      Report.deleteMany({ involvedUserId: id }),
+      Report.deleteMany({ reportedBy: id }),
+      FriendRequest.deleteMany({ $or: [{ sender: id }, { receiver: id }] })
+    ]);
+
+    await User.findByIdAndDelete(id);
+
+    return res.status(200).json({ message: 'Usuario eliminado exitosamente' });
+  } catch (error) {
+    return res.status(500).json({ message: 'Error al eliminar usuario' });
+  }
+}
+
 module.exports = {
   getDashboard,
   getUsers,
   getEvents,
   getReportsSummary,
   getReports,
+  getReportDetail,
+  resolveReport,
+  rejectReport,
+  markReportUnderReview,
+  getUserDetail,
+  blockUser,
+  unblockUser,
+  deleteUser,
   getSettings,
   updateGeneralSettings,
   updateModerationSettings,

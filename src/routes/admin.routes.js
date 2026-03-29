@@ -9,6 +9,14 @@ const {
   getEvents, 
   getReportsSummary, 
   getReports,
+  getReportDetail,
+  resolveReport,
+  rejectReport,
+  markReportUnderReview,
+  getUserDetail,
+  blockUser,
+  unblockUser,
+  deleteUser,
   getSettings,
   updateGeneralSettings,
   updateModerationSettings,
@@ -78,6 +86,104 @@ router.get('/users', requireAuth, requireAdmin, getUsers);
 
 /**
  * @swagger
+ * /api/admin/users/{id}:
+ *   get:
+ *     summary: Obtener detalles de un usuario
+ *     tags: [Administración]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Detalles del usuario
+ *       404:
+ *         description: Usuario no encontrado
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: No autorizado
+ */
+router.get('/users/:id', requireAuth, requireAdmin, getUserDetail);
+
+/**
+ * @swagger
+ * /api/admin/users/{id}/block:
+ *   post:
+ *     summary: Bloquear un usuario
+ *     tags: [Administración]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Usuario bloqueado exitosamente
+ *       404:
+ *         description: Usuario no encontrado
+ *       403:
+ *         description: No autenticado o no autorizado
+ */
+router.post('/users/:id/block', requireAuth, requireAdmin, blockUser);
+
+/**
+ * @swagger
+ * /api/admin/users/{id}/unblock:
+ *   post:
+ *     summary: Desbloquear un usuario
+ *     tags: [Administración]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Usuario desbloqueado exitosamente
+ *       404:
+ *         description: Usuario no encontrado
+ *       403:
+ *         description: No autenticado o no autorizado
+ */
+router.post('/users/:id/unblock', requireAuth, requireAdmin, unblockUser);
+
+/**
+ * @swagger
+ * /api/admin/users/{id}:
+ *   delete:
+ *     summary: Eliminar un usuario
+ *     tags: [Administración]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Usuario eliminado exitosamente
+ *       404:
+ *         description: Usuario no encontrado
+ *       403:
+ *         description: No autenticado o no autorizado
+ */
+router.delete('/users/:id', requireAuth, requireAdmin, deleteUser);
+
+/**
+ * @swagger
  * /api/admin/events:
  *   get:
  *     summary: Listar todos los eventos
@@ -141,6 +247,145 @@ router.get('/reports/summary', requireAuth, requireAdmin, getReportsSummary);
  *         description: No autorizado
  */
 router.get('/reports', requireAuth, requireAdmin, getReports);
+
+/**
+ * @swagger
+ * /api/admin/reports/{id}:
+ *   get:
+ *     summary: Obtener detalles de un reporte
+ *     tags: [Administración]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID del reporte
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Detalles del reporte
+ *       404:
+ *         description: Reporte no encontrado
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: No autorizado
+ */
+router.get('/reports/:id', requireAuth, requireAdmin, getReportDetail);
+
+/**
+ * @swagger
+ * /api/admin/reports/{id}/resolve:
+ *   post:
+ *     summary: Resolver un reporte
+ *     tags: [Administración]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:\n *       required: true
+ *       content:\n *         application/json:
+/**
+ * @swagger
+ * /api/admin/reports/{id}/resolve:
+ *   post:
+ *     summary: Resolver un reporte
+ *     tags: [Administración]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               resolution:
+ *                 type: string
+ *               action:
+ *                 type: string
+ *                 enum: [none, ban]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Reporte resuelto
+ *       404:
+ *         description: Reporte no encontrado
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: No autorizado
+ */
+router.post('/reports/:id/resolve', requireAuth, requireAdmin, resolveReport);
+
+/**
+ * @swagger
+ * /api/admin/reports/{id}/reject:
+ *   post:
+ *     summary: Rechazar un reporte
+ *     tags: [Administración]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Reporte rechazado
+ *       404:
+ *         description: Reporte no encontrado
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: No autorizado
+ */
+router.post('/reports/:id/reject', requireAuth, requireAdmin, rejectReport);
+
+/**
+ * @swagger
+ * /api/admin/reports/{id}/review:
+ *   post:
+ *     summary: Marcar reporte como bajo revisión
+ *     tags: [Administración]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Reporte marcado bajo revisión
+ *       404:
+ *         description: Reporte no encontrado
+ *       401:
+ *         description: No autenticado
+ *       403:
+ *         description: No autorizado
+ */
+router.post('/reports/:id/review', requireAuth, requireAdmin, markReportUnderReview);
 
 /**
  * @swagger
