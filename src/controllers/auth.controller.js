@@ -82,7 +82,9 @@ async function getProfile(req, res) {
       avatarUrl: user.avatarUrl,
       bio: user.bio,
       location: user.location,
-      interests: user.interests || []
+      interests: user.interests || [],
+      attendedEvents: user.attendedEvents || [],
+      savedEvents: user.savedEvents || []
     });
   } catch (error) {
     return res.status(500).json({ message: 'Error al obtener perfil' });
@@ -515,6 +517,62 @@ async function resetPassword(req, res) {
   }
 }
 
+
+// Endpoint para obtener historial de eventos asistidos (últimos 20, populados)
+async function getHistory(req, res) {
+  try {
+    const userId = req.user?.sub;
+    if (!userId) return res.status(401).json({ message: 'No autenticado' });
+
+    const user = await User.findById(userId)
+      .populate({
+        path: 'attendedEvents',
+        model: 'Event',
+        options: { strictPopulate: false }
+      });
+
+    if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+
+    // Los últimos 20, del más reciente al más antiguo
+    const history = [...(user.attendedEvents || [])]
+      .reverse()
+      .slice(0, 20);
+
+    return res.status(200).json({ success: true, data: history });
+  } catch (error) {
+    console.error('GET HISTORY ERROR:', error);
+    return res.status(500).json({ message: 'Error al obtener historial' });
+  }
+}
+
+// Endpoint para obtener eventos a los que el usuario va a asistir (futuros)
+async function getAttending(req, res) {
+  try {
+    const userId = req.user?.sub;
+    if (!userId) return res.status(401).json({ message: 'No autenticado' });
+
+    const user = await User.findById(userId)
+      .populate({
+        path: 'attendedEvents',
+        model: 'Event',
+        options: { strictPopulate: false }
+      });
+
+    if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+
+    const now = new Date();
+    // Solo eventos futuros o sin fecha (permanentes)
+    const attending = (user.attendedEvents || []).filter(
+      (e) => !e.startDate || new Date(e.startDate) >= now
+    );
+
+    return res.status(200).json({ success: true, data: attending });
+  } catch (error) {
+    console.error('GET ATTENDING ERROR:', error);
+    return res.status(500).json({ message: 'Error al obtener eventos de asistencia' });
+  }
+}
+
 module.exports = {
   register,
   login,
@@ -524,5 +582,7 @@ module.exports = {
   getProfile,
   updateProfile,
   requestPasswordReset,
-  resetPassword
+  resetPassword,
+  getHistory,
+  getAttending
 };

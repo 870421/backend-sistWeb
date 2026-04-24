@@ -10,7 +10,9 @@ const {
   getProfile,
   updateProfile,
   requestPasswordReset,
-  resetPassword
+  resetPassword,
+  getHistory,
+  getAttending
 } = require("../controllers/auth.controller");
 
 const cookieParser = require('cookie-parser');
@@ -325,5 +327,11 @@ router.post("/google", loginWithGoogle);
  *       scheme: bearer
  *       bearerFormat: JWT
  */
+
+// Historial de eventos asistidos (últimos 20)
+router.get("/history", requireAuth, getHistory);
+ 
+// Eventos futuros a los que el usuario va a asistir
+router.get("/attending", requireAuth, getAttending);
 
 module.exports = router;

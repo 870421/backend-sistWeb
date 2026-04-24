@@ -147,7 +147,8 @@ const toggleAttendance = async (req, res, next) => {
     if (!user) {
       return res.status(404).json({ success: false, message: "Usuario no encontrado" });
     }
-    const isAttending = user.attendedEvents.includes(eventId);
+    // .toString() necesario porque attendedEvents son ObjectIds, no strings
+    const isAttending = user.attendedEvents.some(id => id.toString() === eventId);
 
     if (isAttending) {
       await User.findByIdAndUpdate(userId, { $pull: { attendedEvents: eventId } });
